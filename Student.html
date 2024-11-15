@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Student Management System</h1>
+            <p class="text-gray-600">Manage your students efficiently</p>
+        </div>
+
+        <!-- Add Student Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Add New Student</h2>
+            <form id="studentForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="name" placeholder="Full Name" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500">
+                    <span id="nameError" class="text-red-500 text-sm hidden">Name is required</span>
+                    <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500">
+                    <span id="emailError" class="text-red-500 text-sm hidden">Email is required</span>
+                    <input type="text" id="studentId" placeholder="Student ID" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500">
+                    <span id="studentIdError" class="text-red-500 text-sm hidden">Student ID is required</span>
+                    <select id="grade" aria-label="Student Grade" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select Grade</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                    <span id="gradeError" class="text-red-500 text-sm hidden">Grade is required</span>
+                </div>
+                <span id="formError" class="text-red-500 text-sm hidden">Error adding student. Please try again.</span>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors">
+                    Add Student
+                </button>
+            </form>
+        </div>
+
+        <!-- Add Search Bar -->
+        <div class="mb-4">
+            <input type="text" id="searchInput" placeholder="Search students..." 
+                class="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Student List -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Student List</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onclick="sortTable('name')">
+                                Name ↕
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentList" class="bg-white divide-y divide-gray-200">
+                        <!-- Student rows will be added here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        let students = [];
+        let editId = null;
+
+        // Enhanced fetchStudents function with better error handling
+        async function fetchStudents() {
+            try {
+                const response = await fetch(`${API_URL}/students`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Fetched data:', data); // Debug log
+                students = Array.isArray(data) ? data : [];
+                updateStudentList();
+            } catch (error) {
+                console.error('Error fetching students:', error);
+                document.getElementById('studentList').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-red-500">
+                            Error loading students. Please check your connection and try again.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Enhanced updateStudentList function
+        function updateStudentList(studentsToShow = students) {
+            const list = document.getElementById('studentList');
+            if (!list) return;
+
+            if (studentsToShow.length === 0) {
+                list.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                            No students found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            list.innerHTML = studentsToShow.map(student => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">${student.name || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${student.email || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${student.studentId || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${student.grade || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <button onclick="editStudent('${student._id}')" 
+                                class="text-blue-600 hover:text-blue-900 mr-2 px-2 py-1 rounded hover:bg-blue-100">
+                            Edit
+                        </button>
+                        <button onclick="deleteStudent('${student._id}')" 
+                                class="text-red-600 hover:text-red-900 px-2 py-1 rounded hover:bg-red-100">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Call fetchStudents immediately and set up periodic refresh
+        fetchStudents();
+        // Refresh data every 30 seconds
+        setInterval(fetchStudents, 30000);
+
+        // Add/Edit student
+        document.getElementById('studentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const studentId = document.getElementById('studentId').value;
+            const grade = document.getElementById('grade').value;
+
+            let isValid = true;
+            if (!name) {
+                document.getElementById('nameError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('nameError').classList.add('hidden');
+            }
+            if (!email) {
+                document.getElementById('emailError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('emailError').classList.add('hidden');
+            }
+            if (!studentId) {
+                document.getElementById('studentIdError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('studentIdError').classList.add('hidden');
+            }
+            if (!grade) {
+                document.getElementById('gradeError').classList.remove('hidden');
+                isValid = false;
+            } else {
+                document.getElementById('gradeError').classList.add('hidden');
+            }
+
+            // Add email format validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                document.getElementById('emailError').textContent = 'Invalid email format';
+                document.getElementById('emailError').classList.remove('hidden');
+                return;
+            }
+
+            if (!isValid) return;
+
+            const studentData = {
+                name,
+                email,
+                studentId,
+                grade
+            };
+
+            try {
+                if (editId) {
+                    await fetch(`${API_URL}/students/${editId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(studentData)
+                    });
+                } else {
+                    await fetch(`${API_URL}/students`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(studentData)
+                    });
+                }
+                await fetchStudents();
+                this.reset();
+                editId = null;
+                document.getElementById('formError').classList.add('hidden');
+            } catch (error) {
+                console.error('Error saving student:', error);
+                document.getElementById('formError').classList.remove('hidden');
+            }
+        });
+
+        // Delete student
+        async function deleteStudent(id) {
+            if (confirm('Are you sure you want to delete this student?')) {
+                try {
+                    await fetch(`${API_URL}/students/${id}`, {
+                        method: 'DELETE'
+                    });
+                    await fetchStudents();
+                } catch (error) {
+                    console.error('Error deleting student:', error);
+                }
+            }
+        }
+
+        // Add search functionality
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredStudents = students.filter(student => 
+                student.name.toLowerCase().includes(searchTerm) ||
+                student.email.toLowerCase().includes(searchTerm) ||
+                student.studentId.toLowerCase().includes(searchTerm)
+            );
+            updateStudentList(filteredStudents);
+        });
+
+        // Add sorting functionality
+        let sortDirection = 1;
+        function sortTable(field) {
+            sortDirection *= -1;
+            quickSort(students, 0, students.length - 1, field);
+            if (sortDirection === -1) students.reverse();
+            updateStudentList();
+        }
+
+        // QuickSort implementation
+        function quickSort(arr, left, right, field) {
+            if (left < right) {
+                const pivotIndex = partition(arr, left, right, field);
+                quickSort(arr, left, pivotIndex - 1, field);
+                quickSort(arr, pivotIndex + 1, right, field);
+            }
+        }
+
+        function partition(arr, left, right, field) {
+            const pivot = arr[right][field];
+            let i = left - 1;
+            for (let j = left; j < right; j++) {
+                if (arr[j][field].localeCompare(pivot) < 0) {
+                    i++;
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+            }
+            [arr[i + 1], arr[right]] = [arr[right], arr[i + 1]];
+            return i + 1;
+        }
+
+        // Fetch and display a single student's data
+        async function fetchStudentById(id) {
+            try {
+                const response = await fetch(`${API_URL}/students/${id}`);
+                const student = await response.json();
+                if (student) {
+                    document.getElementById('name').value = student.name;
+                    document.getElementById('email').value = student.email;
+                    document.getElementById('studentId').value = student.studentId;
+                    document.getElementById('grade').value = student.grade;
+                }
+            } catch (error) {
+                console.error('Error fetching student:', error);
+            }
+        }
+
+        // Modify editStudent function to use fetchStudentById
+        async function editStudent(id) {
+            editId = id;
+            await fetchStudentById(id);
+        }
+
+        // Modify updateStudentList to use _id instead of id
+        function updateStudentList(studentsToShow = students) {
+            const list = document.getElementById('studentList');
+            list.innerHTML = '';
+            studentsToShow.forEach(student => {
+                list.innerHTML += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">${student.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${student.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${student.studentId}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${student.grade}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="editStudent('${student._id}')" class="text-blue-600 hover:text-blue-900 mr-2">Edit</button>
+                            <button onclick="deleteStudent('${student._id}')" class="text-red-600 hover:text-red-900">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Initial load
+        fetchStudents();
+    </script>
+</body>
+</html>
